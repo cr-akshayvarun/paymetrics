@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Welcome{% endblock %}
+{% block content %}
+<div class="home-page">
+    <div class="home-container">
+        <div class="logo-icon">P</div>
+        <h1>Track Expenses with <span>PayMetrics</span></h1>
+        <p class="subtitle">
+            Connect your Gmail and let AI automatically track, categorize, and summarize your expenses. 
+            No manual entry, no spreadsheets — just clarity.
+        </p>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <i class="fas fa-envelope-open-text"></i>
+                <h3>Gmail Integration</h3>
+                <p>Read-only access to detect transaction notifications</p>
+            </div>
+            <div class="feature-card">
+                <i class="fas fa-robot"></i>
+                <h3>Smart Parsing</h3>
+                <p>Regex-powered extraction of amounts & merchants</p>
+            </div>
+            <div class="feature-card">
+                <i class="fas fa-tags"></i>
+                <h3>Auto Categorization</h3>
+                <p>Intelligent sorting by spending categories</p>
+            </div>
+        </div>
+
+        <a href="{{ url_for('auth.login') }}" class="btn btn-google">
+            <img src="https://www.google.com/favicon.ico" alt="">
+            Continue with Google
+        </a>
+
+        <p style="margin-top: 20px; font-size: 12px; color: var(--text-muted);">
+            <i class="fas fa-shield-alt"></i> Read-only Gmail access &bull; Your data stays private
+        </p>
+    </div>
+</div>
+{% endblock %}

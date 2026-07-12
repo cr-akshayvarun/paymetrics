@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <p>Welcome back, {{ user.name or user.email.split('@')[0] }}</p>
+</div>
+
+<div class="stats-grid" id="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(90, 224, 192, 0.15); color: var(--accent-secondary);">
+            <i class="fas fa-wallet"></i>
+        </div>
+        <div class="stat-label">Total Spent</div>
+        <div class="stat-value" id="stat-spent">—</div>
+        <div class="stat-change" id="stat-savings"></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(108, 240, 160, 0.15); color: var(--success);">
+            <i class="fas fa-arrow-down"></i>
+        </div>
+        <div class="stat-label">Total Income</div>
+        <div class="stat-value" id="stat-income">—</div>
+        <div class="stat-change positive"><i class="fas fa-arrow-up"></i> This month</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(124, 108, 240, 0.15); color: var(--accent-primary);">
+            <i class="fas fa-credit-card"></i>
+        </div>
+        <div class="stat-label">Transactions</div>
+        <div class="stat-value" id="stat-count">—</div>
+        <div class="stat-change" id="stat-net">Net savings</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: rgba(240, 192, 108, 0.15); color: var(--warning);">
+            <i class="fas fa-tags"></i>
+        </div>
+        <div class="stat-label">Categories Used</div>
+        <div class="stat-value" id="stat-categories">—</div>
+        <div class="stat-change">This month</div>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <div class="chart-card">
+        <h3><i class="fas fa-chart-donut" style="color: var(--accent-primary);"></i> Spending by Category</h3>
+        <canvas id="categoryChart"></canvas>
+    </div>
+    <div class="chart-card">
+        <h3><i class="fas fa-chart-line" style="color: var(--accent-secondary);"></i> Monthly Trends</h3>
+        <canvas id="trendChart"></canvas>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-clock" style="color: var(--text-muted);"></i> Recent Transactions</h3>
+        <a href="{{ url_for('main.transactions') }}" class="btn btn-secondary btn-sm">View All</a>
+    </div>
+    <div class="card-body">
+        <div class="recent-txns-list" id="recent-txns">
+            <div style="text-align: center; padding: 20px; color: var(--text-muted);">
+                <i class="fas fa-spinner fa-spin"></i> Loading...
+            </div>
+        </div>
+    </div>
+</div>
+
+<div style="text-align: center; margin-top: 32px;">
+    <a href="{{ url_for('main.sync') }}" class="btn btn-primary">
+        <i class="fas fa-sync-alt"></i> Sync Gmail Inbox
+    </a>
+    {% if user.last_sync_at %}
+    <p style="margin-top: 8px; font-size: 12px; color: var(--text-muted);">
+        Last synced: {{ user.last_sync_at.strftime('%b %d, %Y at %I:%M %p') }}
+    </p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CATEGORY_COLORS = {
+    'Food & Dining': '#f97316',
+    'Shopping': '#ec4899',
+    'Transportation': '#3b82f6',
+    'Bills & Utilities': '#8b5cf6',
+    'Entertainment': '#14b8a6',
+    'Healthcare': '#ef4444',
+    'Education': '#f59e0b',
+    'Income': '#10b981',
+    'Other': '#94a3b8',
+};
+
+fetch('/api/stats')
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('stat-spent').textContent = '₹' + (data.total_spent || 0).toLocaleString('en-IN');
+        document.getElementById('stat-income').textContent = '₹' + (data.total_income || 0).toLocaleString('en-IN');
+        document.getElementById('stat-count').textContent = data.transaction_count || 0;
+
+        const catCount = Object.keys(data.category_breakdown || {}).length;
+        document.getElementById('stat-categories').textContent = catCount;
+
+        const netEl = document.getElementById('stat-net');
+        if (data.net_savings >= 0) {
+            netEl.innerHTML = '<span class="positive"><i class="fas fa-arrow-up"></i> Net savings: ₹' + data.net_savings.toLocaleString('en-IN') + '</span>';
+        } else {
+            netEl.innerHTML = '<span class="negative"><i class="fas fa-arrow-down"></i> Net loss: ₹' + Math.abs(data.net_savings).toLocaleString('en-IN') + '</span>';
+        }
+
+        const savingsEl = document.getElementById('stat-savings');
+        if (data.total_income > 0) {
+            const rate = ((data.total_income - data.total_spent) / data.total_income * 100).toFixed(1);
+            savingsEl.innerHTML = '<span class="positive"><i class="fas fa-chart-line"></i> Savings rate: ' + rate + '%</span>';
+        } else if (data.total_spent > 0) {
+            savingsEl.innerHTML = '<span class="negative"><i class="fas fa-exclamation-triangle"></i> No income tracked</span>';
+        }
+
+        const breakdown = data.category_breakdown || {};
+        const labels = Object.keys(breakdown);
+        const values = Object.values(breakdown);
+        const colors = labels.map(l => CATEGORY_COLORS[l] || '#94a3b8');
+
+        if (labels.length > 0) {
+            new Chart(document.getElementById('categoryChart'), {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors,
+                        borderColor: 'var(--bg-card)',
+                        borderWidth: 3,
+                        hoverOffset: 8,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#9494b8', padding: 16, usePointStyle: true, font: { family: 'Inter' } },
+                        },
+                    },
+                },
+            });
+        } else {
+            document.getElementById('categoryChart').parentElement.innerHTML =
+                '<div class="empty-state"><i class="fas fa-chart-pie"></i><h3>No data yet</h3><p>Sync your Gmail to see expense breakdown</p></div>';
+        }
+
+        new Chart(document.getElementById('trendChart'), {
+            type: 'bar',
+            data: {
+                labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+                datasets: [
+                    {
+                        label: 'Spent',
+                        data: data.monthly_spent || [],
+                        backgroundColor: 'rgba(124, 108, 240, 0.6)',
+                        borderColor: '#7c6cf0',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    },
+                    {
+                        label: 'Income',
+                        data: data.monthly_income || [],
+                        backgroundColor: 'rgba(90, 224, 192, 0.3)',
+                        borderColor: '#5ae0c0',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false,
+                    },
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#5c5c80', font: { family: 'Inter', size: 11 } },
+                        grid: { display: false },
+                    },
+                    y: {
+                        ticks: { color: '#5c5c80', font: { family: 'Inter', size: 11 } },
+                        grid: { color: 'rgba(255,255,255,0.03)' },
+                    },
+                },
+            },
+        });
+
+        const recentList = document.getElementById('recent-txns');
+        if (data.recent_transactions && data.recent_transactions.length > 0) {
+            recentList.innerHTML = data.recent_transactions.map(t => {
+                const color = CATEGORY_COLORS[t.category] || '#94a3b8';
+                const cls = t.is_income ? 'income' : 'expense';
+                const sign = t.is_income ? '+' : '-';
+                return `<div class="recent-txn-item">
+                    <div class="recent-txn-icon" style="background: ${color}20; color: ${color};">
+                        <i class="fas fa-receipt"></i>
+                    </div>
+                    <div class="recent-txn-info">
+                        <div class="recent-txn-merchant">${t.merchant || 'Unknown'}</div>
+                        <div class="recent-txn-desc">${t.description}</div>
+                    </div>
+                    <div class="recent-txn-amount ${cls}">${sign}₹${Math.abs(t.amount).toLocaleString('en-IN')}</div>
+                </div>`;
+            }).join('');
+        } else {
+            recentList.innerHTML = `<div class="empty-state">
+                <i class="fas fa-inbox"></i>
+                <h3>No transactions yet</h3>
+                <p>Sync your Gmail inbox to start tracking expenses</p>
+            </div>`;
+        }
+    });
+
+</script>
+{% endblock %}

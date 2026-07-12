@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Transactions{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Transactions</h1>
+    <p>All your parsed expense and income entries</p>
+</div>
+
+<div class="filters-bar">
+    <form method="GET" style="display: contents;" id="filter-form">
+        <input type="text" name="search" class="search-input" placeholder="Search merchant or description..." value="{{ current_search }}">
+        <select name="category" class="filter-select" onchange="this.form.submit()">
+            <option value="all" {% if current_category == 'all' %}selected{% endif %}>All Categories</option>
+            {% for cat, data in categories.items() %}
+            <option value="{{ cat }}" {% if current_category == cat %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+        </select>
+        <select name="sort" class="filter-select" onchange="this.form.submit()">
+            <option value="date_desc" {% if current_sort == 'date_desc' %}selected{% endif %}>Newest First</option>
+            <option value="date_asc" {% if current_sort == 'date_asc' %}selected{% endif %}>Oldest First</option>
+            <option value="amount_desc" {% if current_sort == 'amount_desc' %}selected{% endif %}>Highest Amount</option>
+            <option value="amount_asc" {% if current_sort == 'amount_asc' %}selected{% endif %}>Lowest Amount</option>
+        </select>
+    </form>
+    <a href="{{ url_for('main.sync') }}" class="btn btn-primary btn-sm">
+        <i class="fas fa-sync-alt"></i> Sync
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        {% if transactions %}
+        <table class="transaction-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Merchant</th>
+                    <th>Description</th>
+                    <th>Category</th>
+                    <th>Amount</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for txn in transactions %}
+                <tr>
+                    <td><span class="txn-date">{{ txn.date.strftime('%d %b %Y') }}</span></td>
+                    <td>
+                        <div class="txn-merchant">{{ txn.merchant or '—' }}</div>
+                    </td>
+                    <td>
+                        <div class="txn-merchant">{{ txn.description[:60] }}{% if txn.description|length > 60 %}...{% endif %}</div>
+                    </td>
+                    <td>
+                        <span class="txn-category" style="background: {{ categories[txn.category]['color'] if txn.category in categories else '#94a3b8' }}20; color: {{ categories[txn.category]['color'] if txn.category in categories else '#94a3b8' }};" data-txn-id="{{ txn.id }}">
+                            <i class="fas fa-{{ categories[txn.category]['icon'] if txn.category in categories else 'circle' }}"></i>
+                            {{ txn.category }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="txn-amount {{ 'income' if txn.is_income else 'expense' }}">
+                            {{ '+' if txn.is_income else '-' }}₹{{ '%.2f'|format(txn.amount) }}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" onclick="deleteTransaction({{ txn.id }})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-inbox"></i>
+            <h3>No transactions found</h3>
+            <p>Try syncing your Gmail or adjusting filters</p>
+            <a href="{{ url_for('main.sync') }}" class="btn btn-primary">
+                <i class="fas fa-sync-alt"></i> Sync Now
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if pagination.pages > 1 %}
+<div class="pagination">
+    {% if pagination.has_prev %}
+    <a href="{{ url_for('main.transactions', page=pagination.prev_num, category=current_category, search=current_search, sort=current_sort) }}">&laquo; Prev</a>
+    {% endif %}
+    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+        {% if p %}
+        <a href="{{ url_for('main.transactions', page=p, category=current_category, search=current_search, sort=current_sort) }}" {% if p == pagination.page %}class="current"{% endif %}>{{ p }}</a>
+        {% else %}
+        <span>…</span>
+        {% endif %}
+    {% endfor %}
+    {% if pagination.has_next %}
+    <a href="{{ url_for('main.transactions', page=pagination.next_num, category=current_category, search=current_search, sort=current_sort) }}">Next &raquo;</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
